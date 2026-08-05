@@ -1,9 +1,7 @@
 #import <UIKit/UIKit.h>
 
-//! Project version number for TieBeam.
 FOUNDATION_EXPORT double TieBeamVersionNumber;
 
-//! Project version string for TieBeam.
 FOUNDATION_EXPORT const unsigned char TieBeamVersionString[];
 
 #import <TieBeam/UIView+TBMStyle.h>

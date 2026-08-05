@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = 'TieBeam'
-  s.version          = '1.0.0'
+  s.version          = '1.0.1'
   s.summary          = 'Chain-style UIKit component helpers.'
   s.description      = <<-DESC
 TieBeam provides fluent builders for common UIKit controls such as labels, buttons, toasts and loading hubs.
