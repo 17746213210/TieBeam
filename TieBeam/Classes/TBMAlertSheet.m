@@ -7,6 +7,9 @@
 #import "UIView+TBMPin.h"
 
 static NSInteger const kTBMAlertActionBaseTag = 94000;
+static CGFloat const kTBMAlertActionRowHeight = 48.0;
+static CGFloat const kTBMAlertAlertWidth = 300.0;
+static CGFloat const kTBMAlertSheetMaxWidth = 520.0;
 
 static UIColor *TBMAlertPanelColor(void) {
     if (@available(iOS 13.0, *)) {
@@ -43,16 +46,16 @@ static UIColor *TBMAlertDestructiveColor(void) {
     return UIColor.redColor;
 }
 
+static CGFloat TBMAlertDividerHeight(void) {
+    return 1.0 / UIScreen.mainScreen.scale;
+}
+
 @interface TBMAlertPresenterViewController : UIViewController
 
 @property (nonatomic, copy, nullable) NSString *tbm_titleText;
 @property (nonatomic, copy, nullable) NSString *tbm_messageText;
 @property (nonatomic, assign) TBMAlertStyle tbm_style;
 @property (nonatomic, copy) NSArray<TBMAlertAction *> *tbm_actions;
-@property (nonatomic, weak, nullable) UIView *tbm_sourceView;
-@property (nonatomic, assign) CGRect tbm_sourceRect;
-@property (nonatomic, weak, nullable) UIBarButtonItem *tbm_barButtonItem;
-@property (nonatomic, assign) BOOL tbm_usesPopover;
 @property (nonatomic, strong) UIView *tbm_dimView;
 @property (nonatomic, strong) UIView *tbm_panelView;
 
@@ -63,11 +66,6 @@ static UIColor *TBMAlertDestructiveColor(void) {
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.view.backgroundColor = UIColor.clearColor;
-
-    if (self.tbm_usesPopover) {
-        [self tbm_buildPopoverContent];
-        return;
-    }
 
     self.tbm_dimView = [[UIView alloc] initWithFrame:CGRectZero];
     self.tbm_dimView.translatesAutoresizingMaskIntoConstraints = NO;
@@ -88,9 +86,6 @@ static UIColor *TBMAlertDestructiveColor(void) {
 
 - (void)viewDidAppear:(BOOL)animated {
     [super viewDidAppear:animated];
-    if (self.tbm_usesPopover) {
-        return;
-    }
     [UIView animateWithDuration:0.25 delay:0 options:UIViewAnimationOptionCurveEaseOut animations:^{
         self.tbm_dimView.alpha = 1;
         self.tbm_panelView.alpha = 1;
@@ -159,7 +154,10 @@ static UIColor *TBMAlertDestructiveColor(void) {
         [items addObject:message];
     }
     if (items.count == 0) {
-        return [[UIView alloc] initWithFrame:CGRectZero];
+        UIView *spacer = [[UIView alloc] initWithFrame:CGRectZero];
+        spacer.translatesAutoresizingMaskIntoConstraints = NO;
+        [spacer.heightAnchor constraintEqualToConstant:0].active = YES;
+        return spacer;
     }
     return [TBMStackHub tbm_vertical:^(TBMStackHub *stack) {
         [stack tbm_spacing:8];
@@ -182,7 +180,7 @@ static UIColor *TBMAlertDestructiveColor(void) {
             tbm_action:weakSelf selector:@selector(tbm_actionTapped:)];
     }];
     button.tag = kTBMAlertActionBaseTag + index;
-    [button.heightAnchor constraintEqualToConstant:48].active = YES;
+    [button.heightAnchor constraintEqualToConstant:kTBMAlertActionRowHeight].active = YES;
     return button;
 }
 
@@ -193,7 +191,7 @@ static UIColor *TBMAlertDestructiveColor(void) {
     UIView *separator = [[UIView alloc] initWithFrame:CGRectZero];
     separator.translatesAutoresizingMaskIntoConstraints = NO;
     separator.backgroundColor = [UIColor colorWithWhite:0.85 alpha:1.0];
-    [separator.widthAnchor constraintEqualToConstant:1.0 / UIScreen.mainScreen.scale].active = YES;
+    [separator.widthAnchor constraintEqualToConstant:TBMAlertDividerHeight()].active = YES;
     [separator setContentHuggingPriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
     [separator setContentCompressionResistancePriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
 
@@ -204,7 +202,7 @@ static UIColor *TBMAlertDestructiveColor(void) {
         [stack tbm_views:@[leading, separator, trailing]];
     }];
     [leading.widthAnchor constraintEqualToAnchor:trailing.widthAnchor].active = YES;
-    [row.heightAnchor constraintEqualToConstant:48].active = YES;
+    [row.heightAnchor constraintEqualToConstant:kTBMAlertActionRowHeight].active = YES;
     return row;
 }
 
@@ -252,12 +250,25 @@ static UIColor *TBMAlertDestructiveColor(void) {
             [items addObject:actionArea];
         }
         [stack tbm_spacing:0];
-        [stack tbm_padding:UIEdgeInsetsMake(16, 0, 0, 0)];
+        [stack tbm_padding:UIEdgeInsetsMake(16, 0, 8, 0)];
         [stack tbm_views:items];
     }];
     [panel addSubview:content];
     [[content tbm_style] tbm_pinEdgesTo:panel inset:UIEdgeInsetsZero];
     return panel;
+}
+
+- (void)tbm_pinAlertPanelWidth {
+    NSLayoutConstraint *width = [self.tbm_panelView.widthAnchor constraintEqualToConstant:kTBMAlertAlertWidth];
+    width.priority = UILayoutPriorityDefaultHigh;
+    [NSLayoutConstraint activateConstraints:@[
+        [self.tbm_panelView.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
+        [self.tbm_panelView.centerYAnchor constraintEqualToAnchor:self.view.centerYAnchor],
+        width,
+        [self.tbm_panelView.widthAnchor constraintLessThanOrEqualToAnchor:self.view.widthAnchor constant:-48],
+        [self.tbm_panelView.leadingAnchor constraintGreaterThanOrEqualToAnchor:self.view.leadingAnchor constant:24],
+        [self.tbm_panelView.trailingAnchor constraintLessThanOrEqualToAnchor:self.view.trailingAnchor constant:-24],
+    ]];
 }
 
 - (void)tbm_buildAlertContent {
@@ -277,16 +288,11 @@ static UIColor *TBMAlertDestructiveColor(void) {
 
     BOOL hasHeader = self.tbm_titleText.length > 0 || self.tbm_messageText.length > 0;
     self.tbm_panelView = [self tbm_makePanelWithBody:header actionArea:actionArea includeBody:hasHeader];
+    self.tbm_panelView.translatesAutoresizingMaskIntoConstraints = NO;
     self.tbm_panelView.alpha = 0;
     self.tbm_panelView.transform = CGAffineTransformMakeScale(0.92, 0.92);
     [self.view addSubview:self.tbm_panelView];
-
-    [NSLayoutConstraint activateConstraints:@[
-        [self.tbm_panelView.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
-        [self.tbm_panelView.centerYAnchor constraintEqualToAnchor:self.view.centerYAnchor],
-        [self.tbm_panelView.widthAnchor constraintEqualToConstant:300],
-        [self.tbm_panelView.widthAnchor constraintLessThanOrEqualToAnchor:self.view.widthAnchor constant:-48],
-    ]];
+    [self tbm_pinAlertPanelWidth];
 }
 
 - (void)tbm_buildPhoneActionSheetContent {
@@ -312,7 +318,13 @@ static UIColor *TBMAlertDestructiveColor(void) {
                 tbm_radius:14];
             TBMButton *cancelButton = [self tbm_makeButtonForAction:cancel];
             [cancelPanel addSubview:cancelButton];
-            [[cancelButton tbm_style] tbm_pinEdgesTo:cancelPanel inset:UIEdgeInsetsZero];
+            [NSLayoutConstraint activateConstraints:@[
+                [cancelButton.topAnchor constraintEqualToAnchor:cancelPanel.topAnchor],
+                [cancelButton.leadingAnchor constraintEqualToAnchor:cancelPanel.leadingAnchor],
+                [cancelButton.trailingAnchor constraintEqualToAnchor:cancelPanel.trailingAnchor],
+                [cancelButton.bottomAnchor constraintEqualToAnchor:cancelPanel.bottomAnchor],
+                [cancelButton.heightAnchor constraintEqualToConstant:kTBMAlertActionRowHeight],
+            ]];
             [items addObject:cancelPanel];
         }
         [stack tbm_spacing:8];
@@ -325,38 +337,14 @@ static UIColor *TBMAlertDestructiveColor(void) {
     self.tbm_panelView.transform = CGAffineTransformMakeTranslation(0, 320);
     [self.view addSubview:self.tbm_panelView];
 
+    NSLayoutConstraint *cmo_width = [self.tbm_panelView.widthAnchor constraintEqualToAnchor:self.view.widthAnchor constant:-24];
+    cmo_width.priority = UILayoutPriorityDefaultHigh;
     [NSLayoutConstraint activateConstraints:@[
-        [self.tbm_panelView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:12],
-        [self.tbm_panelView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-12],
+        [self.tbm_panelView.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
+        cmo_width,
+        [self.tbm_panelView.widthAnchor constraintLessThanOrEqualToConstant:kTBMAlertSheetMaxWidth],
         [self.tbm_panelView.bottomAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.bottomAnchor constant:-8],
     ]];
-}
-
-- (void)tbm_buildPopoverContent {
-    NSArray<TBMAlertAction *> *actions = self.tbm_regularActions;
-    TBMAlertAction *cancel = [self tbm_cancelAction];
-    NSMutableArray<TBMAlertAction *> *allActions = [actions mutableCopy];
-    if (cancel) {
-        [allActions addObject:cancel];
-    }
-    if (allActions.count == 0) {
-        allActions = [@[ [TBMAlertAction tbm_actionWithTitle:@"OK" style:TBMAlertActionStyleDefault handler:nil] ] mutableCopy];
-    }
-
-    UIView *header = [self tbm_makeHeaderStack];
-    UIView *actionArea = [self tbm_makeActionStack:allActions horizontal:NO];
-    BOOL hasHeader = self.tbm_titleText.length > 0 || self.tbm_messageText.length > 0;
-    UIView *panel = [self tbm_makePanelWithBody:header actionArea:actionArea includeBody:hasHeader];
-    panel.translatesAutoresizingMaskIntoConstraints = NO;
-    [self.view addSubview:panel];
-    [[panel tbm_style] tbm_pinEdgesTo:self.view inset:UIEdgeInsetsZero];
-
-    CGFloat height = 16 + (self.tbm_titleText.length > 0 ? 24 : 0) + (self.tbm_messageText.length > 0 ? 36 : 0);
-    height += allActions.count * 49;
-    if (self.tbm_titleText.length > 0 && self.tbm_messageText.length > 0) {
-        height += 8;
-    }
-    self.preferredContentSize = CGSizeMake(320, MAX(height, 120));
 }
 
 - (void)tbm_actionTapped:(TBMButton *)sender {
@@ -377,14 +365,6 @@ static UIColor *TBMAlertDestructiveColor(void) {
 
 - (void)tbm_dismissWithAction:(nullable TBMAlertAction *)action {
     void (^handler)(void) = action.handler;
-    if (self.tbm_usesPopover) {
-        [self dismissViewControllerAnimated:YES completion:^{
-            if (handler) {
-                handler();
-            }
-        }];
-        return;
-    }
     [UIView animateWithDuration:0.2 animations:^{
         self.tbm_dimView.alpha = 0;
         if (self.tbm_style == TBMAlertStyleAlert) {
@@ -433,34 +413,18 @@ static UIColor *TBMAlertDestructiveColor(void) {
     if (!controller) {
         return;
     }
+    (void)sourceView;
+    (void)sourceRect;
+    (void)barButtonItem;
 
     TBMAlertPresenterViewController *presenter = [[TBMAlertPresenterViewController alloc] init];
     presenter.tbm_titleText = title;
     presenter.tbm_messageText = message;
     presenter.tbm_style = style;
     presenter.tbm_actions = actions ?: @[];
-    presenter.tbm_sourceView = sourceView;
-    presenter.tbm_sourceRect = sourceRect;
-    presenter.tbm_barButtonItem = barButtonItem;
 
-    BOOL isPad = UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad;
-    BOOL wantsPopover = style == TBMAlertStyleActionSheet && isPad && (sourceView || barButtonItem);
-    presenter.tbm_usesPopover = wantsPopover;
-
-    if (wantsPopover) {
-        presenter.modalPresentationStyle = UIModalPresentationPopover;
-        UIPopoverPresentationController *popover = presenter.popoverPresentationController;
-        if (sourceView) {
-            popover.sourceView = sourceView;
-            popover.sourceRect = CGRectIsEmpty(sourceRect) ? sourceView.bounds : sourceRect;
-        } else {
-            popover.barButtonItem = barButtonItem;
-        }
-        popover.permittedArrowDirections = UIPopoverArrowDirectionAny;
-    } else {
-        presenter.modalPresentationStyle = UIModalPresentationOverFullScreen;
-        presenter.modalTransitionStyle = UIModalTransitionStyleCrossDissolve;
-    }
+    presenter.modalPresentationStyle = UIModalPresentationOverFullScreen;
+    presenter.modalTransitionStyle = UIModalTransitionStyleCrossDissolve;
 
     [controller presentViewController:presenter animated:YES completion:nil];
 }
